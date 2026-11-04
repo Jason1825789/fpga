@@ -1,0 +1,28 @@
+// ① 位置号 → 字库编号(串里重复的字共用一套字模;txt_sel 选开园/闭园句)
+wire [3:0] font_idx = pos_to_font(char_sel, txt_sel);
+// ② 选出该字的 256 位字模(编号×256 = {编号, 8'b0} 作为位选基址)
+wire [255:0] font_bits = FONT_ALL[{font_idx, 8'b00000000} +: 256];
+
+// ③ 邻居坐标(边界钳位,防索引越界)
+wire [4:0] r_up    = (row == 5'd0)  ? 5'd0  : row - 5'd1;
+wire [4:0] r_down  = (row == 5'd15) ? 5'd15 : row + 5'd1;
+wire [4:0] c_left  = (col == 5'd0)  ? 5'd0  : col - 5'd1;
+wire [4:0] c_right = (col == 5'd15) ? 5'd15 : col + 5'd1;
+
+// ④ 三行切片(当前/上一/下一行)
+wire [15:0] fr_cur  = font_bits[{row,    4'b0000} +: 16];
+wire [15:0] fr_up   = font_bits[{r_up,   4'b0000} +: 16];
+wire [15:0] fr_down = font_bits[{r_down, 4'b0000} +: 16];
+
+// ⑤ 笔画本身
+assign pixel_on = fr_cur[15 - col];
+
+// ⑥ 描边:自身不是笔画,但 8 邻域里有笔画
+assign outline_on = ~pixel_on & (
+    fr_up[15 - col]      | fr_down[15 - col] |       // 上 / 下
+    fr_cur[15 - c_left]  | fr_cur[15 - c_right] |    // 左 / 右
+    fr_up[15 - c_left]   | fr_up[15 - c_right] |     // 左上 / 右上
+    fr_down[15 - c_left] | fr_down[15 - c_right]      // 左下 / 右下
+);
+
+endmodule

@@ -1,0 +1,54 @@
+// ===========================================================================
+// 音频总开关（SW4 / C5，拨上=开、拨下=关）
+// ---------------------------------------------------------------------------
+// 设计要点：**只在这一处门控 PCM 数据**，下游同时挂了两路消费者——
+//   1) HDMI 发射核  .I_audio_left_data / .I_audio_right_data  → 决定有没有声音
+//   2) spectrum_engine .audio_l                              → 决定频谱柱高不高
+// 所以一个 mux 就同时管住了"声音 + 频谱图"，两者不可能出现一个开一个关的错位。
+//
+// 关断时**不动 audio_valid / ACR**：仍然照常以 48kHz 送数字静音(全 0)样本，
+// 接收端(电视/显示器)不会因为音频中断而重新协商音频 InfoFrame，
+// 避免"关开关的瞬间屏幕闪一下/声音设备重连"。
+//
+// 频谱侧不需要额外清零：spectrum_engine 收到全 0 样本后，
+// 幅度 c_msb <= MSB_BASE 直接判 0，且 bars[] 每帧按 DECAY 自然下落，
+// 表现为"柱子平滑落到底"，比硬切更自然。
+//
+// 消抖：拨码开关是机械件，动作时会有毫秒级抖动；这里沿用工程里
+// "两级同步 + 整组稳定 16ms 才认" 的做法（与 sw1/sw2 的模式消抖同量级）。
+// 极性：板上 SW4 拨上=高=开，拨下=低=关；约束已配 PULLTYPE=PULLUP。
+// ===========================================================================
+wire        audio_on;                    // 1=开 0=关（已消抖）
+wire [23:0] audio_l_out;                 // 门控后的 PCM（送 HDMI + 频谱）
+wire [23:0] audio_r_out;
+
+reg         sw4_d0;
+reg         sw4_d1;
+reg         sw4_stable;
+reg  [19:0] sw4_cnt;
+
+always @(posedge clk or posedge rst_all) begin
+    if (rst_all) begin
+        sw4_d0     <= 1'b0;
+        sw4_d1     <= 1'b0;
+        sw4_stable <= 1'b0;
+        sw4_cnt    <= 20'd0;
+    end else begin
+        sw4_d0 <= sw4;
+        sw4_d1 <= sw4_d0;
+        if (sw4_d1 != sw4_stable) begin
+            if (sw4_cnt >= 20'd399999) begin      // 400000 拍 @50MHz ≈ 8ms，足够滤掉拨动抖动
+                sw4_stable <= sw4_d1;
+                sw4_cnt    <= 20'd0;
+            end else begin
+                sw4_cnt <= sw4_cnt + 20'd1;
+            end
+        end else begin
+            sw4_cnt <= 20'd0;
+        end
+    end
+end
+
+assign audio_on    = sw4_stable;
+assign audio_l_out = audio_on ? audio_left_data  : 24'sd0;
+assign audio_r_out = audio_on ? audio_right_data : 24'sd0;

@@ -1,0 +1,38 @@
+# 编译产物 / 工具链数据库
+*.db
+*.log
+*.logw
+*.f
+*.al
+*.ini
+*.qdb
+*.qtl
+*.qpg
+*.qor
+*.area
+*.status
+*.timing
+*.rpt
+*.bit
+*.bid
+*.ts
+*.prj
+*.cwc
+*.use_seed2
+
+# 仿真 work 目录（ModelSim 产物）
+work/
+transcript
+
+# workbuddy 内部目录
+.workbuddy/
+.workbuddy-ai/
+
+# 参考文档（非本人源码）
+设计参考例程文档.docx
+设计参考例程文档.md
+
+# 临时文件
+*.tmp
+*.bak
+doc/APUG092_HDMI1.4b_Transmitter_V1.0.docx
